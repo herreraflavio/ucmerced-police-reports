@@ -1,0 +1,26 @@
+run unified_table_orc_fast tomorrow 27th on all the data, it seems to generate better output
+
+also see how long it takes, once we have all the ocr data we can continue with cleaning looking at project tesseract, that one has remaining code
+
+then we can keep the code that is only needed and create one unified pipeline that can add new data as it comes in daily "live"
+
+then it can go in our raspberry pi.
+
+on 1/4/2026
+
+scrape_logs will download daily new logs from uc merced, that code is done
+
+the code to perform ocr is also done, and the code to clean it is also done, now i just need to write a script that will combine all into one clean csv file,
+
+then i can write some script to perform some actions to generate some cool statistics, 
+
+once that is done, all code will be copied to the pi, test it out
+
+then once its running, we can wrap it around a task scheduler that executes the script once every daily
+
+then we can make the server that will have the api endpoints that will access these files geojson output of the statitics and map them
+
+that should be it, i think
+
+also write the page that will show everything that is going on, how it works, what the numbers mean, executes
+finally i can add a page to give credit. 

@@ -1,0 +1,8 @@
+numpy
+Pillow
+python-dotenv
+opencv-python-headless
+pytesseract
+pdf2image
+openai
+paddleocr
