@@ -1,0 +1,12 @@
+{
+  "latest_pdf": "/mnt/usb/ucmercedhub/api/ucmerced-police-reports/scrape_logs/downloads/latest/latest.pdf",
+  "latest_dir": "/mnt/usb/ucmercedhub/api/ucmerced-police-reports/scrape_logs/downloads/latest",
+  "hash": "ddf13920aa607a39f2d1c65a75a32a74f13a496c5af9dd1b48fa5a79982b97e4",
+  "canonical": "01042026",
+  "downloaded_at": "2026-01-06T05:56:15.981Z",
+  "processed_at": "2026-01-06T06:03:11.546369Z",
+  "ocr_out_dir": "/mnt/usb/ucmercedhub/api/ucmerced-police-reports/ocr_scraped_logs/output/ocr_output",
+  "ocr_csv": "/mnt/usb/ucmercedhub/api/ucmerced-police-reports/ocr_scraped_logs/output/ocr_output/latest/latest.csv",
+  "post_script": "/mnt/usb/ucmercedhub/api/ucmerced-police-reports/ocr_scraped_logs/post_process.py",
+  "post_returncode": 0
+}

@@ -5,6 +5,11 @@ const path = require("path");
 const OUT_DIR = path.resolve("downloads");
 const LOG_FILE = path.join(OUT_DIR, "dcl_downloads.log");
 
+// Keep a stable "latest" copy for OCR
+const LATEST_DIR = path.join(OUT_DIR, "latest");
+const LATEST_PDF = path.join(LATEST_DIR, "latest.pdf");
+const LATEST_META = path.join(LATEST_DIR, "latest.json");
+
 // Base URL variants (in order of likelihood)
 const BASES = [
   "https://police.ucmerced.edu/sites/g/files/ufvvjh1446/f/page/documents/dcl_",
@@ -13,9 +18,37 @@ const BASES = [
   "https://police.ucmerced.edu/sites/g/files/ufvvjh1446/f/page/documents/dlc_", // typo-ish fallback
 ];
 
-// Inclusive date range [2023-10-01 .. 2025-08-19]
-const START = new Date(Date.UTC(2023, 7, 10)); // Oct (0-based month)
-const END = new Date(Date.UTC(2025, 11, 18)); // Aug
+// 1-day inclusive range: previous day from current date (UTC calendar day)
+// const now = new Date();
+// const YESTERDAY_UTC = new Date(
+//   Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+// );
+// YESTERDAY_UTC.setUTCDate(YESTERDAY_UTC.getUTCDate() - 1);
+
+// const START = new Date(YESTERDAY_UTC);
+// const END = new Date(YESTERDAY_UTC);
+const now = new Date();
+
+// choose how many days back you want (1 = yesterday, 2 = two days ago, etc.)
+const daysBack = 2;
+
+// Start of *today* in UTC (00:00:00.000)
+const todayUTC = new Date(Date.UTC(
+  now.getUTCFullYear(),
+  now.getUTCMonth(),
+  now.getUTCDate()
+));
+
+// Start of the target day in UTC
+const START = new Date(todayUTC);
+START.setUTCDate(START.getUTCDate() - daysBack);
+
+// End is exactly 1 day later (exclusive)
+const END = new Date(START);
+END.setUTCDate(END.getUTCDate() + 1);
+
+console.log({ START: START.toISOString(), END: END.toISOString() });
+
 
 function fmt2(n) {
   return String(n).padStart(2, "0");
@@ -87,6 +120,40 @@ function pct(n, d) {
   return ((n / d) * 100).toFixed(2) + "%";
 }
 
+function looksLikePdf(buf) {
+  // Quick signature check: "%PDF-"
+  if (!buf || buf.length < 5) return false;
+  return buf.subarray(0, 5).toString("ascii") === "%PDF-";
+}
+
+async function atomicWriteFile(destPath, buf) {
+  const tmpPath = `${destPath}.tmp.${process.pid}.${Date.now()}`;
+  await fsp.writeFile(tmpPath, buf);
+  await fsp.rename(tmpPath, destPath);
+}
+
+async function updateLatestFiles({ outfile, canonical, url, size }) {
+  await fsp.mkdir(LATEST_DIR, { recursive: true });
+
+  const meta = {
+    canonical, // MMDDYYYY
+    source_file: path.resolve(outfile),
+    latest_pdf: path.resolve(LATEST_PDF),
+    url,
+    size,
+    downloaded_at: new Date().toISOString(),
+  };
+  await fsp.writeFile(LATEST_META, JSON.stringify(meta, null, 2), "utf8");
+
+  // Atomic replace of latest.pdf (copy to temp in same dir, then rename)
+  const tmp = path.join(
+    LATEST_DIR,
+    `.latest.${process.pid}.${Date.now()}.tmp.pdf`
+  );
+  await fsp.copyFile(outfile, tmp);
+  await fsp.rename(tmp, LATEST_PDF);
+}
+
 // Try all stamp variants × base URLs for a given date.
 // Returns { ok, url?, size?, stampsTried, combosTried }
 async function tryDownload(dUTC, outfile) {
@@ -114,7 +181,12 @@ async function tryDownload(dUTC, outfile) {
         // Guard against HTML/tiny responses
         if (!ct.includes("pdf") || buf.length < 2048) continue;
 
-        await fsp.writeFile(outfile, buf);
+        // Extra guard: PDF header signature
+        if (!looksLikePdf(buf)) continue;
+
+        // Atomic write for the archive file
+        await atomicWriteFile(outfile, buf);
+
         return {
           ok: true,
           url,
@@ -134,7 +206,10 @@ async function tryDownload(dUTC, outfile) {
   await fsp.mkdir(OUT_DIR, { recursive: true });
   await fsp.appendFile(
     LOG_FILE,
-    `\n===== Run started ${new Date().toISOString()} =====\n`,
+    `\n===== Run started ${new Date().toISOString()} =====\n` +
+      `Range: ${START.toISOString().slice(0, 10)} to ${END
+        .toISOString()
+        .slice(0, 10)} (UTC)\n`,
     "utf8"
   );
 
@@ -167,8 +242,18 @@ async function tryDownload(dUTC, outfile) {
 
     if (res.ok) {
       successes++;
+
+      // Update downloads/latest/latest.pdf + latest.json
+      await updateLatestFiles({
+        outfile,
+        canonical,
+        url: res.url,
+        size: res.size,
+      });
+
       await logLine(
         `✅ dcl_${canonical}.pdf saved (from ${res.url}, ${res.size} bytes). ` +
+          `Updated latest -> ${LATEST_PDF}. ` +
           `Day ${dayIndex}/${totalDays}. Attempts ${attempts}, success ${successes}, fail ${failures}, ` +
           `fail rate ${pct(failures, attempts)}`
       );
